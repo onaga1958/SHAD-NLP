@@ -14,18 +14,18 @@ Gym for predictive models
 ```
 4. Install required python packages
     1. modelgym:
-```
+	```
 	pip install git+https://github.com/yandexdataschool/modelgym.git
-```
+	```
 
     2. jupyter, yaml, hyperopt, skopt, pandas and networkx:
 
-```
+	```
 	pip install jupyter pyyaml hyperopt scikit-optimize pandas networkx==1.11
-```
+	```
 
     3. lightGBM:
-```
+	```
 	git clone --recursive https://github.com/Microsoft/LightGBM
 	cd LightGBM
 	git checkout 80c641cd17727bebea613af3cbfe3b985dbd3313
@@ -34,10 +34,10 @@ Gym for predictive models
 	cd ../python-package/ && python setup.py install
 	cd ../../
 	rm -rf LightGBM
-```
+	```
 
     4. XGBoost:
-```
+	```
 	git clone --recursive https://github.com/dmlc/xgboost
 	cd xgboost
 	git checkout 14fba01b5ac42506741e702d3fde68344a82f9f0
@@ -45,5 +45,5 @@ Gym for predictive models
 	cd python-package; python setup.py install
 	cd ../../
 	rm -rf xgboost
-```
+	```
 5. Open in jupyter-notebook modelgym/example/model\_search.ipynb and run all cells. If there are no errors, everything is allright.
