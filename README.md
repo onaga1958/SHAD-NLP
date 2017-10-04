@@ -17,10 +17,13 @@ Gym for predictive models
 ```
 	pip install git+https://github.com/yandexdataschool/modelgym.git
 ```
+
     2. jupyter, yaml, hyperopt, skopt, pandas and networkx
+
 ```
 	pip install jupyter pyyaml hyperopt scikit-optimize pandas networkx==1.11
 ```
+
     3. lightGBM
 ```
 	git clone --recursive https://github.com/Microsoft/LightGBM
@@ -32,6 +35,7 @@ Gym for predictive models
 	cd ../../
 	rm -rf LightGBM
 ```
+
     4. XGBoost
 ```
 	git clone --recursive https://github.com/dmlc/xgboost
