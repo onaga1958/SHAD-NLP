@@ -8,23 +8,23 @@ Gym for predictive models
 **Note:** This gym works with python3.
 1. Create directory where you want to install this rep and switch to it
 2. Start python venv
-3. Clone repository
+3. Clone repository:
 ```
     git clone https://github.com/yandexdataschool/modelgym.git
 ```
-4. Install required python packages.
-    1. modelgym
+4. Install required python packages
+    1. modelgym:
 ```
 	pip install git+https://github.com/yandexdataschool/modelgym.git
 ```
 
-    2. jupyter, yaml, hyperopt, skopt, pandas and networkx
+    2. jupyter, yaml, hyperopt, skopt, pandas and networkx:
 
 ```
 	pip install jupyter pyyaml hyperopt scikit-optimize pandas networkx==1.11
 ```
 
-    3. lightGBM
+    3. lightGBM:
 ```
 	git clone --recursive https://github.com/Microsoft/LightGBM
 	cd LightGBM
@@ -36,7 +36,7 @@ Gym for predictive models
 	rm -rf LightGBM
 ```
 
-    4. XGBoost
+    4. XGBoost:
 ```
 	git clone --recursive https://github.com/dmlc/xgboost
 	cd xgboost
