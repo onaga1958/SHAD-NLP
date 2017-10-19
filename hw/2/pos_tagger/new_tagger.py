@@ -63,8 +63,8 @@ def write_tagged_sentence(tagged_sentence, f):
     Write tagged sentence to file-like object f.
     """
     for i, tagged_word in enumerate(tagged_sentence):
-        f.write('{}\t{}\t\t{}\n'.forma(i + 1, tagged_word.text,
-                                       tagged_word.tag))
+        f.write('{}\t{}\t\t{}\n'.format(i + 1, tagged_word.text,
+                                        tagged_word.tag))
     f.write('\n')
 
 
@@ -347,7 +347,12 @@ class BeamSearchTask:
         If two hypos have the same recombination hashes, they can be collapsed
         together, leaving only the hypothesis with a better score.
         """
-        raise NotImplementedError()
+        # this implementation returns typle of tags, which accounts in features
+        result = tuple()
+        for i in range(self._tagger_params.dst_order):
+            result += (hypo.tagged_word.tag,)
+            hypo = hypo.prev
+        return result
 
 
 def sort_and_cut(hypos_list, remain_num):
@@ -496,7 +501,8 @@ def make_batches(dataset, minibatch_size):
     """
     Make list of batches from a list of examples.
     """
-    sequence = shuffle(list(range(ceil(len(dataset) / minibatch_size))))
+    sequence = list(range(ceil(len(dataset) / minibatch_size)))
+    shuffle(sequence)
     for i in sequence:
         yield dataset[i*minibatch_size:(i + 1)*minibatch_size]
 
