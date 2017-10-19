@@ -672,7 +672,7 @@ def TEST_add_cmdargs(subp):
                    'for features',
                    type=int, default=4)
     p.add_argument('--beam-size',
-                   help='Beam size', type=int, default=1)
+                   help='Beam size', type=int, default=4)
 
     return 'test'
 
