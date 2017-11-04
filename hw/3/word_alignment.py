@@ -90,7 +90,7 @@ def normalize(corpus):
     lemmatizer = WordNetLemmatizer()
     for sentence in corpus:
         for i, word in enumerate(sentence):
-            sentence[i] = lemmatizer.lemmatize(word)
+            sentence[i] = lemmatizer.lemmatize(word.lower())
 
     return corpus
 
