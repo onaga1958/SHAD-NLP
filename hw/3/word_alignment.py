@@ -2,86 +2,68 @@
 
 import sys
 import numpy as np
-# from models import PriorModel  # <-- Implemented as a uniform distribution.
-from models import TranslationModel  # <-- Not implemented
-from models import TransitionModel  # <-- You will need this for an HMM.
+from models import TranslationModel
+from models import TransitionModel
 from utils import read_all_tokens, output_alignments_per_test_set
+from hmm import backward, forward, viterby
 from nltk.stem import WordNetLemmatizer
-from hmm import forward, backward, viterby
 
 
-def get_alignment_posteriors(src_tokens, trg_tokens, transition_model,
-                             translation_model):
-    """
-    Compute the posterior alignment probability p(a_j=i | f, e) for each target
-    token f_j.
-    """
-    params = [len(src_tokens)]
-    transition = transition_model.get_parameters_for_sentence_pair(*params)
-    params = [src_tokens, trg_tokens]
-    translation = translation_model.get_parameters_for_sentence_pair(*params)
+def get_alignment_posteriors(src_tokens, trg_tokens, transition_model, translation_model):
+    "Compute the posterior alignment probability p(a_j=i | f, e) for each target token f_j."
+    transition = transition_model.get_parameters_for_sentence_pair(len(src_tokens))
+    transition = transition[1:]
+    initial = transition[0]
+    translation = translation_model.get_parameters_for_sentence_pair(src_tokens, trg_tokens)
 
-    params = (transition[0], transition[1:], translation)
+    posteriors = np.zeros((len(trg_tokens) - 1, len(src_tokens), len(src_tokens)))
+    single_posteriors = np.zeros((len(trg_tokens), len(src_tokens)))
+
+    params = (initial, transition, translation)
     observations = np.arange(len(trg_tokens))
-    alpha = forward(params, observations)[0]
-    beta = backward(params, observations)[0]
-
-    posterior = np.zeros((len(trg_tokens), len(src_tokens) + 1,
-                          len(src_tokens)))
-    nominator = alpha * beta
-    posterior[:, 0] = (nominator.T / np.sum(nominator, axis=1)).T
-    for t in range(1, len(trg_tokens)):
-        nominator = (transition[1:] * alpha[t - 1] * translation[:, t] *
-                     beta[t])
-        posterior[t, 1:] = nominator / np.sum(nominator)
-
+    alpha = forward(params, observations)
+    beta = backward(params, observations)
     answers = viterby(*params)
 
-    prev = np.concatenate((np.array([0]), answers[:-1] + 1))
-    log_likelihood = np.sum(np.log(transition[prev, answers]) +
-                            np.log(translation[answers,
-                                               np.arange(len(answers))]))
-    return posterior, log_likelihood, answers
+    for t in range(len(trg_tokens) - 1):
+        nominator = alpha[t, :] * transition.T * translation[:, t + 1] * beta[t + 1, :]
+        posteriors[t] = nominator.T / np.sum(nominator)
+
+    nominator = alpha * beta
+    single_posteriors = (nominator.T / np.sum(nominator, axis=1)).T
+    log_likelihood = (np.log(initial[answers[0]]) +
+                      np.sum(np.log(transition[answers[:-1], answers[1:]])) +
+                      np.sum(np.log(translation[answers, np.arange(len(trg_tokens))])))
+
+    return (posteriors, single_posteriors), log_likelihood, answers
 
 
-def collect_expected_statistics(src_corpus, trg_corpus, transition_model,
-                                translation_model):
-    """
-    E-step: infer posterior distribution over each sentence pair and collect
-    statistics.
-    """
+def collect_expected_statistics(src_corpus, trg_corpus, transition_model, translation_model):
+    "E-step: infer posterior distribution over each sentence pair and collect statistics."
     corpus_log_likelihood = 0.0
     for src_tokens, trg_tokens in zip(src_corpus, trg_corpus):
         # Infer posterior
-        result = get_alignment_posteriors(src_tokens, trg_tokens,
-                                          transition_model,
-                                          translation_model)
-        alignment_posteriors, log_likelihood, _ = result
+        alignment_posteriors, log_likelihood, _ = get_alignment_posteriors(src_tokens, trg_tokens, transition_model,
+                                                                           translation_model)
         # Collect statistics in each model.
-        transition_model.collect_statistics(len(src_tokens),
-                                            alignment_posteriors)
-        translation_model.collect_statistics(src_tokens, trg_tokens,
-                                             alignment_posteriors)
+        transition_model.collect_statistics(len(src_tokens), *alignment_posteriors)
+        translation_model.collect_statistics(src_tokens, trg_tokens, alignment_posteriors[1])
         # Update log prob
         corpus_log_likelihood += log_likelihood
     return corpus_log_likelihood
 
 
-def estimate_models(src_corpus, trg_corpus, transition_model, translation_model,
-                    num_iterations):
+def estimate_models(src_corpus, trg_corpus, transition_model, translation_model, num_iterations):
     "Estimate models iteratively."
     for iteration in range(num_iterations):
         # E-step
-        corpus_log_likelihood = collect_expected_statistics(src_corpus,
-                                                            trg_corpus,
-                                                            transition_model,
+        corpus_log_likelihood = collect_expected_statistics(src_corpus, trg_corpus, transition_model,
                                                             translation_model)
         # M-step
         transition_model.recompute_parameters()
         translation_model.recompute_parameters()
         if iteration > 0:
-            print(str(iteration) + ' iteration: ' +
-                  "corpus log likelihood: %1.3f" % corpus_log_likelihood)
+            print("corpus log likelihood: %1.3f" % corpus_log_likelihood)
     return transition_model, translation_model
 
 

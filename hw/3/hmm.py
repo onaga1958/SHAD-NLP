@@ -6,23 +6,18 @@
 # This is a generic and very readable implementation of a discrete HMM but it
 # will need adapting to do word alignment.
 #
-# 1. This implementation assumes a fixed number of hidden states across all
-# sequences.
-# In word alignment, however, the number of hidden states is equal to
-# the number of source tokens so your HMM parameters (pi, O, A) will change
-# for each sentence.
+# 1. This implementation assumes a fixed number of hidden states across all sequences.
+# In word alignment, however, the number of hidden states is equal to the number of
+# source tokens so your HMM parameters (pi, O, A) will change for each sentence.
 #
 # 2. This implementation is very readable but not very efficient or practical.
-# (i) You should make it more efficent by collapsing loops into numpy matrix
-# operations.
-# (ii) You should scale the forward and backward probabilities
-# (i.e. alpha and beta) to
+# (i) You should make it more efficent by collapsing loops into numpy matrix operations.
+# (ii) You should scale the forward and backward probabilities (i.e. alpha and beta) to
 # avoid numerical underflow on longer sequences.
 #
-# 3. You will probably only need the forward and backward methods from this
-# file.
-# Once you have the alpha and beta probabilities you can easily compute
-# the statistics needed by the models in models.py.
+# 3. You will probably only need the forward and backward methods from this file.
+# Once you have the alpha and beta probabilities you can easily compute the statistics
+# needed by the models in models.py.
 
 import numpy as np
 
@@ -35,13 +30,12 @@ def forward(params, observations):
     alpha = np.zeros((N, S))
 
     # base case
-    alpha[0] = pi * O[:, observations[0]]
+    alpha[0, :] = pi * O[:, observations[0]]
 
     # recursive case
     for i in range(1, N):
-        alpha[i] = np.sum(A.T * alpha[i - 1],
-                          axis=1) * O[:, observations[i - 1]]
-    return (alpha, np.sum(alpha[N-1, :]))
+        alpha[i] = np.sum(A.T * alpha[i - 1], axis=1) * O[:, observations[i]]
+    return alpha
 
 
 def backward(params, observations):
@@ -52,12 +46,12 @@ def backward(params, observations):
     beta = np.zeros((N, S))
 
     # base case
-    beta[N - 1] = 1
+    beta[N - 1, :] = 1
 
     # recursive case
     for i in range(N - 2, -1, -1):
-        beta[i] = np.sum(A * beta[i + 1], axis=1) * O[:, observations[i + 1]]
-    return (beta, np.sum(pi * O[:, observations[0]] * beta[0, :]))
+        beta[i] = np.sum(A * beta[i + 1] * O[:, observations[i + 1]], axis=1)
+    return beta
 
 
 def viterby(pi, A, O):
