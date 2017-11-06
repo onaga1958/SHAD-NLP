@@ -31,6 +31,7 @@ def get_alignment_posteriors(src_tokens, trg_tokens, transition_model, translati
 
         nominator = alpha * beta
         single_posteriors = (nominator.T / np.sum(nominator, axis=1)).T
+
         log_likelihood = (np.log(initial[answers[0]]) +
                           np.sum(np.log(transition[answers[:-1], answers[1:]])) +
                           np.sum(np.log(translation[answers, np.arange(len(trg_tokens))])))
@@ -106,7 +107,7 @@ def normalize(corpus, not_lemmatized=True):
             if not_lemmatized:
                 word = lemmatizer.lemmatize(word)
 
-            sentence[i] = word
+            sentence[i] = word[:5]
 
     return corpus
 

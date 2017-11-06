@@ -27,10 +27,11 @@ class Model:
         self._counter = defaultdict(lambda: defaultdict(lambda: 0))
 
     def recompute_parameters(self):
+        eps = 1e-10
         for first_key, inner_dict in self._counter.items():
-            total_count = sum(list(inner_dict.values()))
+            total_count = sum(list(inner_dict.values())) + eps * len(inner_dict)
             for second_key, cnt in inner_dict.items():
-                self._probs[first_key][second_key] = cnt / total_count
+                self._probs[first_key][second_key] = (cnt + eps) / total_count
 
         self._reset_cnt()
 
