@@ -30,7 +30,7 @@ def forward(params, observations):
     alpha = np.zeros((N, S))
 
     # base case
-    alpha[0, :] = pi * O[:, observations[0]]
+    alpha[0] = pi * O[:, observations[0]]
 
     # recursive case
     for i in range(1, N):
@@ -46,7 +46,7 @@ def backward(params, observations):
     beta = np.zeros((N, S))
 
     # base case
-    beta[N - 1, :] = 1
+    beta[N - 1] = 1
 
     # recursive case
     for i in range(N - 2, -1, -1):

@@ -12,8 +12,8 @@ from nltk.stem import WordNetLemmatizer
 def get_alignment_posteriors(src_tokens, trg_tokens, transition_model, translation_model):
     "Compute the posterior alignment probability p(a_j=i | f, e) for each target token f_j."
     transition = transition_model.get_parameters_for_sentence_pair(len(src_tokens))
-    transition = transition[1:]
     initial = transition[0]
+    transition = transition[1:]
     translation = translation_model.get_parameters_for_sentence_pair(src_tokens, trg_tokens)
 
     posteriors = np.zeros((len(trg_tokens) - 1, len(src_tokens), len(src_tokens)))
@@ -26,8 +26,8 @@ def get_alignment_posteriors(src_tokens, trg_tokens, transition_model, translati
     answers = viterby(*params)
 
     for t in range(len(trg_tokens) - 1):
-        nominator = alpha[t, :] * transition.T * translation[:, t + 1] * beta[t + 1, :]
-        posteriors[t] = nominator.T / np.sum(nominator)
+        nominator = (alpha[t, :] * transition.T).T * translation[:, t + 1] * beta[t + 1, :]
+        posteriors[t] = nominator / np.sum(nominator)
 
     nominator = alpha * beta
     single_posteriors = (nominator.T / np.sum(nominator, axis=1)).T
@@ -63,7 +63,7 @@ def estimate_models(src_corpus, trg_corpus, transition_model, translation_model,
         transition_model.recompute_parameters()
         translation_model.recompute_parameters()
         if iteration > 0:
-            print("corpus log likelihood: %1.3f" % corpus_log_likelihood)
+            print(str(iteration) + ": corpus log likelihood: %1.3f" % corpus_log_likelihood)
     return transition_model, translation_model
 
 
