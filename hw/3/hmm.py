@@ -67,5 +67,5 @@ def viterby(pi, A, O):
 
     result = [np.argmax(probs[:, -1])]
     for i in range(O.shape[1] - 1, 0, -1):
-        result.append(max_path[result[-1]][i])
+        result.append(max_path[result[-1], i])
     return np.array(list(reversed(result)))

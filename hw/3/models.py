@@ -66,12 +66,45 @@ class TransitionModel(Model):
 
     def get_parameters_for_sentence_pair(self, src_length):
         "Retrieve the parameters for this sentence pair: A[k, i] = p(a_{j} = i|a_{j-1} = k)"
-        return np.array([[self._probs[(src_length, k)][i] for i in range(src_length)]
-                         for k in range(-1, src_length)])
+        transition = np.array([[self._probs[(src_length)][i - k] for i in range(src_length)]
+                               for k in range(src_length)])
+        initial = np.array([self._probs[(src_length, 'initial')][i] for i in range(src_length)])
+        return initial, transition
 
     def collect_statistics(self, src_length, posteriors, single_posteriors):
         "Accumulate statistics from transition_posteriors[k][i]: p(a_{j} = i, a_{j-1} = k|e, f)"
         for i in range(src_length):
-            self._counter[(src_length, -1)][i] += single_posteriors[0, i]
+            self._counter[(src_length, 'initial')][i] += single_posteriors[0, i]
             for k in range(src_length):
-                self._counter[(src_length, k)][i] += posteriors[:, k, i].sum()
+                self._counter[(src_length)][i - k] += posteriors[:, k, i].sum()
+
+
+class PriorModel:
+    """
+    Models the prior probability of an alignment given only the sentence
+    lengths and token indices.
+    """
+
+    def __init__(self):
+        "Add counters and parameters here for a prior model."
+        pass
+
+    def get_prior_prob(self, src_index, trg_index, src_length, trg_length):
+        "Returns a prior probability based on src and trg indices."
+        return 1 / src_length
+
+    def get_parameters_for_sentence_pair(self, src_length, trg_length):
+        "Return a numpy array with all prior p[i][j] = p(i|j, I, J)."
+        return np.array([[self.get_prior_prob(i, j, src_length, trg_length)
+                          for j in range(trg_length)]
+                         for i in range(src_length)])
+
+    def collect_statistics(self, src_length, trg_length, posterior_matrix):
+        """
+        Accumulate counts of alignment events from posterior_matrix[j][i] =
+        p(a_j=i|e, f)
+        """
+        pass
+
+    def recompute_parameters(self, *args):
+        pass

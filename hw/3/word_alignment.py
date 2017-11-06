@@ -4,6 +4,7 @@ import sys
 import numpy as np
 from models import TranslationModel
 from models import TransitionModel
+from models import PriorModel
 from utils import read_all_tokens, output_alignments_per_test_set
 from hmm import backward, forward, viterby
 from nltk.stem import WordNetLemmatizer
@@ -11,31 +12,46 @@ from nltk.stem import WordNetLemmatizer
 
 def get_alignment_posteriors(src_tokens, trg_tokens, transition_model, translation_model):
     "Compute the posterior alignment probability p(a_j=i | f, e) for each target token f_j."
-    transition = transition_model.get_parameters_for_sentence_pair(len(src_tokens))
-    initial = transition[0]
-    transition = transition[1:]
-    translation = translation_model.get_parameters_for_sentence_pair(src_tokens, trg_tokens)
+    if isinstance(transition_model, TransitionModel):
+        initial, transition = transition_model.get_parameters_for_sentence_pair(len(src_tokens))
+        translation = translation_model.get_parameters_for_sentence_pair(src_tokens, trg_tokens)
 
-    posteriors = np.zeros((len(trg_tokens) - 1, len(src_tokens), len(src_tokens)))
-    single_posteriors = np.zeros((len(trg_tokens), len(src_tokens)))
+        posteriors = np.zeros((len(trg_tokens) - 1, len(src_tokens), len(src_tokens)))
+        single_posteriors = np.zeros((len(trg_tokens), len(src_tokens)))
 
-    params = (initial, transition, translation)
-    observations = np.arange(len(trg_tokens))
-    alpha = forward(params, observations)
-    beta = backward(params, observations)
-    answers = viterby(*params)
+        params = (initial, transition, translation)
+        observations = np.arange(len(trg_tokens))
+        alpha = forward(params, observations)
+        beta = backward(params, observations)
+        answers = viterby(*params)
 
-    for t in range(len(trg_tokens) - 1):
-        nominator = (alpha[t, :] * transition.T).T * translation[:, t + 1] * beta[t + 1, :]
-        posteriors[t] = nominator / np.sum(nominator)
+        for t in range(len(trg_tokens) - 1):
+            nominator = (alpha[t, :] * transition.T).T * translation[:, t + 1] * beta[t + 1, :]
+            posteriors[t] = nominator / np.sum(nominator)
 
-    nominator = alpha * beta
-    single_posteriors = (nominator.T / np.sum(nominator, axis=1)).T
-    log_likelihood = (np.log(initial[answers[0]]) +
-                      np.sum(np.log(transition[answers[:-1], answers[1:]])) +
-                      np.sum(np.log(translation[answers, np.arange(len(trg_tokens))])))
+        nominator = alpha * beta
+        single_posteriors = (nominator.T / np.sum(nominator, axis=1)).T
+        log_likelihood = (np.log(initial[answers[0]]) +
+                          np.sum(np.log(transition[answers[:-1], answers[1:]])) +
+                          np.sum(np.log(translation[answers, np.arange(len(trg_tokens))])))
+        return (posteriors, single_posteriors), log_likelihood, answers
+    else:
+        # here transition_model is a prior_model
+        prior = transition_model.get_parameters_for_sentence_pair(len(src_tokens),
+                                                                  len(trg_tokens))
+        traslation = translation_model.get_parameters_for_sentence_pair(src_tokens,
+                                                                        trg_tokens)
 
-    return (posteriors, single_posteriors), log_likelihood, answers
+        nominator = prior * traslation
+        denominator = np.sum(nominator, axis=0)
+        alignment_posteriors = nominator / denominator
+
+        answers = np.argmax(alignment_posteriors, axis=0)
+        arange = np.arange(len(trg_tokens))
+        log_likelihood = (np.log(prior[answers, arange]).sum() +
+                          np.log(traslation[answers, arange]).sum())
+
+        return [len(trg_tokens), alignment_posteriors.T], log_likelihood, answers
 
 
 def collect_expected_statistics(src_corpus, trg_corpus, transition_model, translation_model):
@@ -96,8 +112,8 @@ def normalize(corpus, not_lemmatized=True):
 
 
 if __name__ == "__main__":
-    if not len(sys.argv) == 5:
-        print("Usage ./word_alignment.py src_corpus trg_corpus iterations " +
+    if not len(sys.argv) == 6:
+        print("Usage ./word_alignment.py src_corpus trg_corpus pretrain_iteratioins iterations " +
               "output_prefix.")
         sys.exit(0)
     src_corpus = read_all_tokens(sys.argv[1])
@@ -105,12 +121,20 @@ if __name__ == "__main__":
 
     src_corpus = normalize(src_corpus)
     trg_corpus = normalize(trg_corpus, sys.argv[2].find('lemmas') == -1)
-    num_iterations = int(sys.argv[3])
-    output_prefix = sys.argv[4]
+
+    IBM1_num_iterations = int(sys.argv[3])
+    num_iterations = int(sys.argv[4])
+    output_prefix = sys.argv[5]
     assert len(src_corpus) == len(trg_corpus), "Corpora should be same size!"
 
     transition_model, translation_model = initialize_models(src_corpus,
                                                             trg_corpus)
+    prior_model = PriorModel()
+    _, translation_model = estimate_models(src_corpus,
+                                           trg_corpus,
+                                           prior_model,
+                                           translation_model,
+                                           IBM1_num_iterations)
     transition_model, translation_model = estimate_models(src_corpus,
                                                           trg_corpus,
                                                           transition_model,
