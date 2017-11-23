@@ -6,10 +6,13 @@ from basic_model import infer_length
 
 
 class AttentionGRUTranslationModel:
-    def __init__(self, name, inp_voc, out_voc, emb_size, hid_size,
-                 attention_function, bidirectional=True):
+    _BILINEAR = 'bilinear'
+    _PERCEPTRON = 'perceptron'
+    _DOT_PRODUCT = 'dot product'
 
-        assert bidirectional, 'only bidirectional yet'
+    def __init__(self, name, inp_voc, out_voc, emb_size, hid_size,
+                 attention_function, bidirectional=True, attention_size=None):
+
         self.name = name
         self.inp_voc = inp_voc
         self.out_voc = out_voc
@@ -18,15 +21,27 @@ class AttentionGRUTranslationModel:
         self.hid_size = hid_size
 
         with tf.variable_scope(name):
-            if attention_function == 'bilinear':
+            if attention_function == self._BILINEAR:
                 self.attention_W = tf.Variable(np.zeros((hid_size, hid_size)), dtype=np.float32)
+            elif attention_function == self._PERCEPTRON:
+                if attention_size is None:
+                    attention_size = hid_size
+                self.attention_W_hid = tf.Variable(np.zeros((attention_size, hid_size)),
+                                                   dtype=np.float32)
+                self.attention_W_emb = tf.Variable(np.zeros((attention_size, hid_size)),
+                                                   dtype=np.float32)
+                self.attention_v = tf.Variable(np.zeros(attention_size), dtype=np.float32)
+            elif attention_function == self._DOT_PRODUCT:
+                pass
             else:
                 raise ValueError('Unknown attention_function: %s' % attention_function)
             self.emb_inp = L.Embedding(len(inp_voc), emb_size)
             self.emb_out = L.Embedding(len(out_voc), emb_size)
-            self.enc0 = tf.nn.rnn_cell.GRUCell(hid_size // 2)
-            self.enc1 = tf.nn.rnn_cell.GRUCell(hid_size // 2)
-            # self.enc0 = tf.nn.rnn_cell.GRUCell(hid_size)
+            if bidirectional:
+                self.enc0 = tf.nn.rnn_cell.GRUCell(hid_size // 2)
+                self.enc1 = tf.nn.rnn_cell.GRUCell(hid_size // 2)
+            else:
+                self.enc0 = tf.nn.rnn_cell.GRUCell(hid_size)
             self.dec0 = tf.nn.rnn_cell.GRUCell(hid_size)
             self.logits = L.Dense(len(out_voc))
 
@@ -48,12 +63,17 @@ class AttentionGRUTranslationModel:
         """
         inp_lengths = infer_length(inp, self.inp_voc.eos_ix)
         inp_emb = self.emb_inp(inp)
+        if self.bidirectional:
+            outputs, final_state = tf.nn.bidirectional_dynamic_rnn(self.enc0, self.enc1, inp_emb,
+                                                                   sequence_length=inp_lengths,
+                                                                   dtype=inp_emb.dtype)
+            outputs, final_state = tf.concat(outputs, 2), tf.concat(final_state, 1)
+        else:
+            outputs, final_state = tf.nn.dynamic_rnn(self.enc0, inp_emb,
+                                                     sequence_length=inp_lengths,
+                                                     dtype=inp_emb.dtype)
 
-        outputs, final_state = tf.nn.bidirectional_dynamic_rnn(self.enc0, self.enc1, inp_emb,
-                                                               sequence_length=inp_lengths,
-                                                               dtype=inp_emb.dtype)
-
-        return tf.concat(outputs, 2), tf.concat(final_state, 1)
+        return outputs, final_state
 
     def decode(self, prev_state, prev_tokens, attention, **flags):
         """
@@ -73,13 +93,30 @@ class AttentionGRUTranslationModel:
         return [new_dec_state], output_logits
 
     def attention(self, encodings, prev_hidden):
-        if self.attention_function == 'bilinear':
+        if self.attention_function == self._BILINEAR:
             scores = tf.tensordot(encodings, self.attention_W, axes=[[2], [0]])
             scores = tf.transpose(scores, [1, 0, 2])
             scores = tf.reduce_sum(scores * prev_hidden, axis=2)
-            probs = tf.nn.softmax(scores, dim=0)
-            attention = tf.reduce_sum(probs * tf.transpose(encodings, [2, 1, 0]), axis=1)
-            attention = tf.transpose(attention, [1, 0])
+
+        if self.attention_function == self._PERCEPTRON:
+            emb_multiply_result = tf.tensordot(encodings, self.attention_W_emb,
+                                               axes=[[2], [1]])
+
+            # (batch_size, seq_len, attention_size) -> (seq_len, batch_size, attention_size)
+            emb_multiply_result = tf.transpose(emb_multiply_result, [1, 0, 2])
+            hid_multiply_result = tf.tensordot(prev_hidden, self.attention_W_hid,
+                                               axes=[[1], [1]])
+            scores = emb_multiply_result + hid_multiply_result
+            scores = tf.tanh(scores)
+            scores = tf.tensordot(scores, self.attention_v, axes=[[2], [0]])
+
+        if self.attention_function == self._DOT_PRODUCT:
+            transposed_encodings = tf.transpose(encodings, [1, 0, 2])
+            scores = tf.reduce_sum(transposed_encodings * prev_hidden, axis=2)
+
+        probs = tf.nn.softmax(scores, dim=0)
+        attention = tf.reduce_sum(probs * tf.transpose(encodings, [2, 1, 0]), axis=1)
+        attention = tf.transpose(attention, [1, 0])
 
         return attention  # , probs
 
